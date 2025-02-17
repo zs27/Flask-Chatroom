@@ -1,0 +1,45 @@
+{% extends 'base.jinja' %}
+
+
+{% block content %} 
+    <h1>Sign Up</h1>
+    <p>Username</p>
+    <input id="username"/>
+    <p>Password</p>
+    <input id="password" type="password"/>
+    <button onclick="signup()">Sign up</button>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bcryptjs/2.4.3/bcrypt.js"></script>
+    <script>
+        const CryptoJS = require('crypto-js');
+        const axios = require('axios');     
+        
+         function isValidURL(string) {
+            if (string.length == 0) {
+                return false;
+            }
+            if (string[0] == "/") {
+                return true;
+            }
+            return false;
+        }
+
+        async function signup() {
+            let loginURL = "{{ url_for('signup_user') }}";
+
+            let salt = bcrypt.genSaltSync(10);
+            let encrypted_password = bcrypt.hashSync($("#password").val(), salt);
+
+
+            let res = await axios.post(loginURL, {
+                username: $("#username").val(),
+                salt: salt,
+                password: encrypted_password
+            });
+            if (!isValidURL(res.data)) {
+                alert(res.data);
+                return;
+            }
+            window.open(res.data, "_self")
+        }
+    </script>
+{% endblock %}

@@ -1,0 +1,304 @@
+{% extends 'base.jinja' %}
+
+{% block content %} 
+   <style>
+
+
+
+    #friends_list {
+        position: absolute;
+        right: 0;
+        top: 80px;
+        border-left: 1px solid black;
+        width: 200px;
+        height: 400px;
+        overflow: auto;
+        padding: 2px;
+    }
+    .friend {
+        padding: 5px;
+        cursor: pointer;
+    }
+    .friend:hover {
+        background-color: #f0f0f0;
+    }
+
+
+
+    nav {
+        border-bottom: 1px solid black;
+        overflow: auto
+    }
+
+    #message_box {
+        border: 1px solid black; 
+        height: 400px; 
+        width: 800px; 
+        overflow: auto;
+        padding: 2px;
+    }
+
+    .text  {
+        margin-top: 2px;
+        margin-bottom: 2px;
+    }
+
+</style>
+
+
+
+
+
+<nav style="border-bottom: 1px solid black;">
+    <ol style="float: right">
+        <li style="display:inline-block">Username:  {{ username }} </li>
+    </ol>
+</nav>
+
+<h1>Messaging App </h1>
+
+
+
+<div id="friends_list">
+    {% for friend in friends %}
+        <div class="friend" onclick="select_friend('{{ friend }}')">{{ friend }}</div>
+    {% endfor %}
+</div>
+
+
+<div id="message_box"></div>
+
+<div id="chat_box">
+<p  class="text">Chat with: </p>
+<input id="receiver" placeholder="username">
+<button onclick="join_room()">Chat</button>
+</div>
+
+<div id="input_box" style="display: none" >
+<p class="text">Message: </p>
+<input id="message" placeholder="message">
+<button onclick="send()">Send</button>
+<button onclick="leave()">Leave Room</button>
+</div>
+
+
+
+
+<script src="/static/js/libs/socket.io.min.js"></script>
+<script>
+
+
+
+    async function generateKeyPair() {
+        const keyPair = await window.crypto.subtle.generateKey(
+            {
+                name: "ECDH",
+                namedCurve: "P-256",
+            },
+            true,
+            ["deriveKey"]
+        );
+        return keyPair;
+    }
+
+    // Export public key
+    async function exportPublicKey(key) {
+        const exportedKey = await window.crypto.subtle.exportKey("spki", key);
+        return new Uint8Array(exportedKey);
+    }
+
+    // Import public key
+    async function importPublicKey(keyData) {
+        const importedKey = await window.crypto.subtle.importKey(
+            "spki",
+            keyData,
+            {
+                name: "ECDH",
+                namedCurve: "P-256",
+            },
+            true,
+            []
+        );
+        return importedKey;
+    }
+
+    // Derive shared secret
+    async function deriveSharedSecret(privateKey, publicKey) {
+        {# otherUserPublicKey
+        keyPair.privateKey #}
+        const derivedKey = await window.crypto.subtle.deriveKey(
+            {
+                name: "ECDH",
+                public: publicKey,
+            },
+            privateKey,
+            {
+                name: "AES-GCM",
+                length: 256,
+            },
+            true,
+            ["encrypt", "decrypt"]
+        );
+        return derivedKey;
+    }
+
+
+
+
+
+    let room_id = 0;
+
+
+    $("#message").on("keyup", (e) => {
+        if (e.key == "Enter") {
+            send();
+        }
+    })
+
+     $("#receiver").on("keyup", (e) => {
+        if (e.key == "Enter") {
+            join_room();
+        }
+    })
+
+    $(document).ready(() => {
+        
+        if (Cookies.get("room_id") == undefined) {
+            return;
+        }
+        $("#chat_box").hide();
+        $("#input_box").show();
+        room_id = parseInt(Cookies.get("room_id"));
+    })
+    
+    let username = "{{ username }}";
+
+    Cookies.set('username', username);
+
+    const socket = io();
+
+      socket.on("incoming", (msg, color="black") => {
+        add_message(msg, color);
+      })
+      
+    function send() {
+        let message = $("#message").val();
+        $("#message").val("");
+        socket.emit("send", username, message, room_id);  
+    } 
+
+    /*
+    async function join_room() {
+        let receiver = $("#receiver").val();
+
+        socket.emit("join", username, receiver, async (res) => {
+            // ...
+            
+            // Generate the key pair
+            
+            
+            // Send public key to the server
+            socket.emit("send_public_key", publicKey);
+            // Listen for public key from the other user
+            socket.on("receive_public_key", (otherUserPublicKey) => {
+                console.log("here")
+                const otherPublicKey = importPublicKey(otherPublicKeyData);
+                const sharedSecret =  deriveSharedSecret(keyPair.privateKey, otherPublicKey);
+                // sharedSecret is now available for use in encryption and decryption
+            //})
+
+            
+        
+            // Listen for the init_key_exchange event
+            
+
+        });
+        room_id = res;
+        Cookies.set("room_id", room_id);
+        $("#input_box").show();
+        $("#chat_box").hide();
+
+        
+
+
+
+        $("#chat_box").hide();
+        $("#input_box").show();
+}
+*/
+
+
+
+
+
+    async function join_room() {
+       
+        let receiver = $("#receiver").val();
+        socket.emit("join", username, receiver, (res) => {
+            
+            room_id = res;
+        
+        
+            Cookies.set("room_id", room_id);
+        });
+        const keyPair = await generateKeyPair();
+        const publicKey = await exportPublicKey(keyPair.publicKey);
+        socket.emit("send_public_key", publicKey);
+        $("#input_box").show();
+        $("#chat_box").hide();
+     
+    }
+
+
+    // Your username variable
+
+
+    socket.on('receive_public_key', (data) => {
+        debugger
+        console.log('Received data:', data);
+        
+        let otherUserPublicKey;
+        for (const user in data) {
+            if (user !== username) {
+                otherUserPublicKey = data[user];
+                break;
+            }
+        }
+
+        if (otherUserPublicKey) {
+            console.log("Other user's public key:", otherUserPublicKey);
+            // Process the public key of the other user
+        } else {
+            console.log('Public key not found for other user');
+        }
+    });
+
+    
+
+
+
+
+
+     function select_friend(friend) {
+        // Update the input field and join the room
+        $("#receiver").val(friend);
+        join_room();
+    }
+
+    function leave() {
+        Cookies.remove("room_id");
+        socket.emit("leave", username, room_id);
+        $("#input_box").hide();
+        $("#chat_box").show();
+    }
+
+    function add_message(message, color) {
+        let box = $("#message_box");
+        let child = $(`<p style="color:${color}; margin: 0px;"></p>`).text(message);
+        box.append(child);
+    }
+    
+ 
+
+</script>
+{% endblock %}
