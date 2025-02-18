@@ -2,6 +2,8 @@
 
 Flask Webapp using diffie hellman key exchange protocol and SSL certificate to allow for secure instant messaging for individuals and groups. As this app runs on cookies to test multiple client communication use different profiles or multiple browsers.
 
+Written in collaboration with https://github.com/KaL893 
+
 To setup, install these packages
 
 ```bash
